@@ -6,7 +6,7 @@ Version 0.4.2 separates MP3 and MP4 downloads, gives Donate a light blue coffee-
 
 ## Install
 
-Download **StreamPocket.apk** from this repository's **Releases** page. This single universal installer includes ARM and Intel processor support. Transfer it to your Android phone, open it, and allow installation from that source when Android asks. Android 10 or newer is required. This is a development build, signed with a development key; it is not a Play Store release.
+Download **StreamPocket.apk** from the [latest release](https://github.com/gatofile/StreamPocket/releases/latest). This single universal installer includes ARM and Intel processor support. Transfer it to your Android phone, open it, and allow installation from that source when Android asks. Android 10 or newer is required. This is a development build, signed with a development key; it is not a Play Store release.
 
 ## Use
 
@@ -34,27 +34,6 @@ The **Donate on Ko-fi** button in Settings opens [ko-fi.com/gatofile](https://ko
 - A stream that returns HTTP 403 is retried once with newly extracted stream URLs. Numeric year/track fields are stored as numbers, while empty numeric fields are omitted; edited tags remain intact on retry. Persistent access restrictions are reported as errors.
 - Downloads use Android WorkManager and foreground notifications. Android may defer work or stop long-running downloads; error details and manual retry are available. Download history follows WorkManager retention and is not a permanent media library.
 - Download only content you own or have permission to download. No login credentials, search history, or media are uploaded to an app-owned server. Requests go to YouTube, media/artwork hosts, and the upstream update service.
-
-## Build
-
-Open this folder in Android Studio with **JDK 21**, **Android SDK Platform 36**, and **Build Tools 36.0.0** installed. Let Android Studio create its own `local.properties`. The included Gradle wrapper uses Gradle 8.13.
-
-```powershell
-.\gradlew.bat assembleDebug testDebugUnitTest lintDebug
-```
-
-macOS/Linux: `chmod +x gradlew` and run `./gradlew assembleDebug testDebugUnitTest lintDebug`.
-
-The universal APK is written to `app/build/outputs/apk/debug/app-debug.apk`. No signing secrets or developer machine paths are included in the source archive.
-
-## Implementation
-
-- Kotlin and Jetpack Compose / Material 3
-- Python, QuickJS, and FFmpeg through [youtubedl-android 0.18.1](https://github.com/yausername/youtubedl-android/tree/0.18.1), with the [official yt-dlp nightly engine](https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/tag/2026.10.10.233141) supplied in `app/src/main/assets/yt-dlp`.
-- Source information is reused for up to two minutes to avoid repeating the same extraction at download time, then edited tags and artwork are applied before conversion and embedding. Older information is refreshed.
-- Android MediaStore for device media folders; Storage Access Framework for custom folders. No broad storage permission is requested.
-- Jobs and settings persist in private device storage. Separate workers allow one failed download to leave the others running. Removed entries are hidden persistently without pruning unrelated WorkManager records. Phone-file deletion targets only that download's stored content URI, using MediaStore or the document provider.
-- Unit tests cover URL safety, official-song selection, capped MP4 selection, MP3 bitrate arguments, filenames, persisted metadata edits, actual engine-version detection, checksum rejection, verified activation, and rollback. Robolectric Compose tests cover navigation, invalid-link errors, metadata editing, immediate review opening, background enrichment, and downloads without a destination popup.
 
 ## License
 
