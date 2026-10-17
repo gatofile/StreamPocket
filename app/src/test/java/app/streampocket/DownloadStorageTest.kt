@@ -106,6 +106,61 @@ class DownloadStorageTest {
         assertTrue(removed)
         assertTrue(provider.deleted.isEmpty())
     }
+    @Test fun bulkRemovalKeepsFilesCancelsSelectedWorkAndPreservesUnrelatedWork() {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        runCatching { androidx.work.WorkManager.initialize(context, androidx.work.Configuration.Builder().build()) }
+        val manager = androidx.work.WorkManager.getInstance(context)
+        val active = androidx.work.OneTimeWorkRequestBuilder<DownloadWorker>().setInitialDelay(1, java.util.concurrent.TimeUnit.DAYS)
+            .addTag("download").addTag("format:MP3").build()
+        val unrelated = androidx.work.OneTimeWorkRequestBuilder<DownloadWorker>().setInitialDelay(1, java.util.concurrent.TimeUnit.DAYS).build()
+        manager.enqueue(listOf(active, unrelated)).result.get()
+        val spec = File(context.filesDir, "jobs/${active.id}.json").apply { parentFile!!.mkdirs(); writeText("saved request") }
+        val provider = RecordingProvider()
+        provider.attachInfo(context, ProviderInfo().apply { authority = "media" })
+        ShadowContentResolver.registerProviderInternal("media", provider)
+        val saved = Format.entries.map { format -> androidx.work.WorkInfo(UUID.randomUUID(), androidx.work.WorkInfo.State.SUCCEEDED,
+            setOf("download", "format:${format.name}"), outputData = androidx.work.workDataOf("uri" to "content://media/external/${format.name}/42")) }
+        val vm = AppViewModel(context)
+        vm.removeAllDownloads(saved + manager.getWorkInfoById(active.id).get()!!, false)
+        awaitRemoval(vm)
+        assertEquals((saved.map { it.id.toString() } + active.id.toString()).toSet(), DownloadHistory(context).removed())
+        assertEquals(androidx.work.WorkInfo.State.CANCELLED, manager.getWorkInfoById(active.id).get()!!.state)
+        assertEquals(androidx.work.WorkInfo.State.ENQUEUED, manager.getWorkInfoById(unrelated.id).get()!!.state)
+        assertFalse(spec.exists())
+        assertTrue(provider.deleted.isEmpty())
+        assertEquals("Downloads removed", vm.notice)
+        assertNull(vm.error)
+    }
+    @Test fun bulkFileRemovalContinuesAfterDenialAndHandlesAlreadyMissingFiles() {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        runCatching { androidx.work.WorkManager.initialize(context, androidx.work.Configuration.Builder().build()) }
+        val denied = RecordingProvider().apply { this.denied = true }
+        val missing = RecordingProvider().apply { exists = false }
+        val saved = RecordingProvider()
+        listOf("denied.files" to denied, "missing.files" to missing, "saved.files" to saved).forEach { (authority, provider) ->
+            provider.attachInfo(context, ProviderInfo().apply { this.authority = authority })
+            ShadowContentResolver.registerProviderInternal(authority, provider)
+        }
+        val jobs = listOf("denied.files", "missing.files", "saved.files").map { authority -> androidx.work.WorkInfo(UUID.randomUUID(),
+            androidx.work.WorkInfo.State.SUCCEEDED, setOf("download", "format:MP4"),
+            outputData = androidx.work.workDataOf("uri" to "content://$authority/file/42")) }
+        val vm = AppViewModel(context)
+        vm.removeAllDownloads(jobs, true)
+        awaitRemoval(vm)
+        assertEquals(jobs.drop(1).map { it.id.toString() }.toSet(), DownloadHistory(context).removed())
+        assertEquals(listOf(Uri.parse("content://saved.files/file/42")), saved.deleted)
+        assertTrue(denied.deleted.isEmpty()); assertTrue(missing.deleted.isEmpty())
+        assertEquals("File not found", vm.notice)
+        assertEquals("Couldn't remove 1 download. Check folder access and try again.", vm.error)
+    }
+    private fun awaitRemoval(vm: AppViewModel) {
+        val deadline = System.currentTimeMillis() + 5000
+        while (vm.removingDownloads.isNotEmpty() && System.currentTimeMillis() < deadline) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        assertTrue(vm.removingDownloads.isEmpty())
+    }
     private class RecordingProvider : ContentProvider() {
         val deleted = mutableListOf<Uri>()
         var deletionResult = 1

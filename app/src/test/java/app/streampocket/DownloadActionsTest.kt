@@ -147,6 +147,43 @@ class DownloadActionsTest {
         ui.onNodeWithText("Audio only").assertIsDisplayed()
         ui.onNodeWithText("No MP4 downloads").assertDoesNotExist()
     }
+    @Test fun deleteAllRequiresConfirmationAndIncludesBothFormatTabs() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+        runCatching { androidx.work.WorkManager.initialize(context, androidx.work.Configuration.Builder().build()) }
+        val vm = AppViewModel(context).apply { downloadFormat = Format.MP4 }
+        val jobs = Format.entries.map { format -> androidx.work.WorkInfo(java.util.UUID.randomUUID(), androidx.work.WorkInfo.State.SUCCEEDED,
+            setOf("download", "name:Saved ${format.name}", "format:${format.name}"),
+            outputData = androidx.work.workDataOf("uri" to "content://media/external/${format.name}/42")) }
+        ui.setContent { StreamPocketTheme { Downloads(vm, jobs) } }
+        ui.onNodeWithContentDescription("Delete all downloads").performClick()
+        ui.onNodeWithText("Delete all downloads?").assertIsDisplayed()
+        ui.onNodeWithText("Remove all 2 downloads from both the MP3 and MP4 tabs?").assertIsDisplayed()
+        ui.onNode(isToggleable()).assertIsOff()
+        screenshot("preview-delete-all.png")
+        ui.onNodeWithText("Cancel").performClick()
+        assertTrue(DownloadHistory(context).removed().isEmpty())
+        ui.onNodeWithContentDescription("Delete all downloads").performClick()
+        ui.onNodeWithText("Delete all", substring = false).performClick()
+        ui.waitUntil(5000) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); vm.removingDownloads.isEmpty() }
+        assertEquals(jobs.map { it.id.toString() }.toSet(), DownloadHistory(context).removed())
+        ui.runOnIdle { assertNull(vm.error) }
+    }
+    @Test fun deletingAllPhoneFilesRequiresAnExplicitCheckboxChoice() {
+        var decision: Boolean? = null
+        ui.setContent { StreamPocketTheme { DeleteAllDownloadsDialog(3, true, {}, { decision = it }) } }
+        ui.onNodeWithText("Active downloads will also be cancelled.").assertIsDisplayed()
+        ui.onNode(isToggleable()).assertIsOff().performClick()
+        ui.onNodeWithText("Delete all", substring = false).performClick()
+        assertEquals(true, decision)
+    }
+    @Test fun deleteAllIsDisabledForAnEmptyDownloadList() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+        runCatching { androidx.work.WorkManager.initialize(context, androidx.work.Configuration.Builder().build()) }
+        val vm = AppViewModel(context)
+        ui.setContent { StreamPocketTheme { Downloads(vm, emptyList()) } }
+        ui.onNodeWithContentDescription("Delete all downloads").assertIsNotEnabled()
+        ui.onNodeWithText("Delete all downloads?").assertDoesNotExist()
+    }
     private fun screenshot(name: String) {
         ui.waitForIdle()
         ui.runOnIdle {
