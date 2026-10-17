@@ -1,3 +1,9 @@
+# 0.5.1
+
+- Add a red Delete all button at the top right of Downloads, covering both MP3 and MP4 tabs.
+- Require confirmation and keep saved files unless the user selects file deletion.
+- Cancel active downloads, retain entries whose files cannot be deleted, and handle already-missing files without stopping the remaining removals.
+
 # 0.5.0
 
 - Check GitHub's latest public release at launch and prompt when a newer app version is available.
