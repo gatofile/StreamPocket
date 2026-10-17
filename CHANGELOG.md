@@ -1,3 +1,10 @@
+# 0.5.0
+
+- Check GitHub's latest public release at launch and prompt when a newer app version is available.
+- Put App update first in Settings, with manual checks, current-version status, and download progress.
+- Download updates only after confirmation, verify their checksum, package, version, and signing key, then open Android's installer.
+- Handle installation permission, cancelled downloads, failed checks, and retries without clearing app data.
+
 # 0.4.2
 
 - Check the download engine when Settings opens. Show Update only after confirming an update is available; show Up to date otherwise, with a refresh icon for manual checks.

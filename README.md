@@ -2,7 +2,7 @@
 
 A native Android app for finding YouTube videos and saving MP3 audio or MP4 video on your phone. Android 10 or newer. No server or API key is required.
 
-Version 0.4.2 separates MP3 and MP4 downloads, gives Donate a light blue coffee-button style, and shows the engine's Update button only when an update is available. The compact interface, Show in folder, and missing-file handling remain included. Install this APK over the previous version; settings and downloads do not need to be cleared.
+Version 0.5.0 checks GitHub for app updates on launch and asks before downloading a new version. App update is the first item in Settings, with a manual check and an Up to date status. Android asks you to confirm installation. Install this APK over the previous version; settings and downloads do not need to be cleared.
 
 ## Install
 
