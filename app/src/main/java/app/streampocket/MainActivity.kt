@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,7 @@ internal fun StreamPocketTheme(content: @Composable () -> Unit) { MaterialTheme(
 @Composable
 fun StreamPocket(shared: String = "", vm: AppViewModel = viewModel()) {
     val context = LocalContext.current
+    AppUpdateDialogs(vm.appUpdate)
     val downloads by vm.downloads.collectAsStateWithLifecycle(emptyList())
     val snackbar = remember { SnackbarHostState() }
     var folderCallback by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -288,6 +290,7 @@ private fun SettingsScreen(vm: AppViewModel, pick: ((String) -> Unit) -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(Unit) { vm.checkEngineUpdate(showDialog = false) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { AppUpdateSetting(vm.appUpdate); HorizontalDivider(color = Panel) }
         item { GroupLabel("Quality"); QualityChoice("MP3 audio", Format.MP3, s.audioQuality) { vm.settings(s.copy(audioQuality = it)) }; QualityChoice("MP4 video", Format.MP4, s.videoQuality) { vm.settings(s.copy(videoQuality = it)) } }
         item { HorizontalDivider(color = Panel); Spacer(Modifier.height(12.dp)); GroupLabel("Folders") }
         item { Text("MP3 audio", fontSize = 14.sp); FolderChoice(s.audioFolder, Format.MP3, { pick { vm.settings(vm.settings.copy(audioFolder = it)) } }, { vm.settings(s.copy(audioFolder = "")) }) }
@@ -301,7 +304,7 @@ private fun SettingsScreen(vm: AppViewModel, pick: ((String) -> Unit) -> Unit) {
         }
         item {
             HorizontalDivider(color = Panel)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.testTag("engine-update-setting"), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
                     Text("Download engine", fontSize = 15.sp)
                     Text(vm.engineVersion, fontSize = 12.sp, color = Muted)

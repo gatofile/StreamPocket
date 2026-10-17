@@ -21,8 +21,9 @@ data class Review(val original: Media, val selected: Media, val tags: Tags, val 
 
 enum class EngineUpdateState { CURRENT, AVAILABLE, INSTALLING, CHECK_FAILED, UPDATE_FAILED }
 
-class AppViewModel(application: Application, private val repository: MediaSource) : AndroidViewModel(application) {
+class AppViewModel(application: Application, private val repository: MediaSource, appUpdates: AppUpdateSource = AppUpdateManager(application)) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, MediaRepository(application))
+    val appUpdate = AppUpdateController(appUpdates, viewModelScope)
     private val preferences = Preferences(application)
     private val manager = WorkManager.getInstance(application)
     private val history = DownloadHistory(application)
