@@ -75,3 +75,24 @@ internal fun DeleteDownloadDialog(title: String, format: String, hasFile: Boolea
         confirmButton = { TextButton({ onDelete(deleteFile) }, colors = ButtonDefaults.textButtonColors(contentColor = DeleteRed)) { Text("Delete") } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } })
 }
+
+@Composable
+internal fun DeleteAllDownloadsDialog(count: Int, active: Boolean, onDismiss: () -> Unit, onDelete: (Boolean) -> Unit) {
+    var deleteFiles by remember { mutableStateOf(false) }
+    AlertDialog(onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.Delete, null, tint = DeleteRed) },
+        title = { Text("Delete all downloads?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Remove ${if (count == 1) "the download" else "all $count downloads"} from both the MP3 and MP4 tabs?")
+                if (active) Text("Active downloads will also be cancelled.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(deleteFiles, { deleteFiles = it }, colors = CheckboxDefaults.colors(checkedColor = DeleteRed))
+                    Text("Also delete downloaded MP3 and MP4 files from this phone", Modifier.weight(1f))
+                }
+                Text("Leave unchecked to keep the files.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton({ onDelete(deleteFiles) }, colors = ButtonDefaults.textButtonColors(contentColor = DeleteRed)) { Text("Delete all") } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } })
+}

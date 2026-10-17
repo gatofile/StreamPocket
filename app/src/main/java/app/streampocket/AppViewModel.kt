@@ -11,6 +11,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import org.json.JSONObject
@@ -126,22 +128,51 @@ class AppViewModel(application: Application, private val repository: MediaSource
         viewModelScope.launch {
             try {
                 val removed = withContext(Dispatchers.IO) {
-                    var latest = manager.getWorkInfoById(job.id).get() ?: job
-                    if (!latest.state.isFinished) {
-                        manager.cancelWorkById(job.id).result.get()
-                        latest = manager.getWorkInfoById(job.id).get() ?: latest
-                    }
-                    val missing = DownloadRemoval.run(deleteFile, latest.outputData.getString("uri") ?: job.outputData.getString("uri"),
-                        delete = { DownloadRemoval.deleteFile(getApplication(), it) },
-                        removeEntry = { history.hide(job.id) })
-                    File(getApplication<Application>().filesDir, "jobs/${job.id}.json").delete()
-                    history.removed() to missing
+                    removeSavedDownload(job, deleteFile)
                 }
-                removedDownloads.value = removed.first
+                removedDownloads.value = removedDownloads.value + removed.first
                 if (removed.second) notice = "File not found"
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = "Could not remove this download. ${e.message.orEmpty()}" }
             finally { removingDownloads = removingDownloads - job.id }
+        }
+    }
+    private fun removeSavedDownload(job: WorkInfo, deleteFile: Boolean): Pair<Set<String>, Boolean> {
+        var latest = manager.getWorkInfoById(job.id).get() ?: job
+        if (!latest.state.isFinished) {
+            manager.cancelWorkById(job.id).result.get()
+            latest = manager.getWorkInfoById(job.id).get() ?: latest
+        }
+        val missing = DownloadRemoval.run(deleteFile, latest.outputData.getString("uri") ?: job.outputData.getString("uri"),
+            delete = { DownloadRemoval.deleteFile(getApplication(), it) }, removeEntry = { history.hide(job.id) })
+        File(getApplication<Application>().filesDir, "jobs/${job.id}.json").delete()
+        return history.removed() to missing
+    }
+    fun removeAllDownloads(jobs: List<WorkInfo>, deleteFiles: Boolean) {
+        if (jobs.isEmpty() || removingDownloads.isNotEmpty()) return
+        val selected = jobs.distinctBy { it.id }
+        val ids = selected.map { it.id }.toSet()
+        removingDownloads = ids
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    var missing = 0
+                    var failed = 0
+                    selected.forEach { job ->
+                        currentCoroutineContext().ensureActive()
+                        try { if (removeSavedDownload(job, deleteFiles).second) missing++ }
+                        catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { failed++ }
+                    }
+                    Triple(history.removed(), missing, failed)
+                }
+                removedDownloads.value = removedDownloads.value + result.first
+                if (result.second > 0) notice = "File not found"
+                else if (result.third == 0) notice = "Downloads removed"
+                if (result.third > 0) error = "Couldn't remove ${result.third} ${if (result.third == 1) "download" else "downloads"}. Check folder access and try again."
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = "Could not remove the downloads. ${e.message.orEmpty()}" }
+            finally { removingDownloads = removingDownloads - ids }
         }
     }
     fun showInFolder(job: WorkInfo, open: (android.net.Uri) -> Unit) {

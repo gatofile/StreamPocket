@@ -347,9 +347,16 @@ internal fun SavedDownloadActions(open: () -> Unit, showFolder: () -> Unit) {
 internal fun Downloads(vm: AppViewModel, jobs: List<WorkInfo>) {
     val context = LocalContext.current
     var pendingDelete by remember { mutableStateOf<WorkInfo?>(null) }
+    var pendingClear by remember { mutableStateOf<List<WorkInfo>?>(null) }
     val sorted = jobs.filter { it.tags.contains("format:${vm.downloadFormat.name}") }
         .sortedByDescending { File(context.filesDir, "jobs/${it.id}.json").lastModified() }
     Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Downloads", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            IconButton(onClick = { pendingClear = jobs.toList() }, enabled = jobs.isNotEmpty() && vm.removingDownloads.isEmpty()) {
+                Icon(Icons.Rounded.DeleteSweep, "Delete all downloads", tint = if (jobs.isNotEmpty() && vm.removingDownloads.isEmpty()) DeleteRed else Muted)
+            }
+        }
         TabRow(selectedTabIndex = vm.downloadFormat.ordinal, containerColor = Background, contentColor = Accent) {
             Format.entries.forEach { format ->
                 Tab(selected = vm.downloadFormat == format, onClick = { vm.downloadFormat = format },
@@ -400,4 +407,6 @@ internal fun Downloads(vm: AppViewModel, jobs: List<WorkInfo>) {
         format = job.tags.firstOrNull { it.startsWith("format:") }?.removePrefix("format:") ?: "media",
         hasFile = !job.outputData.getString("uri").isNullOrBlank(), active = !job.state.isFinished,
         onDismiss = { pendingDelete = null }, onDelete = { deleteFile -> pendingDelete = null; vm.removeDownload(job, deleteFile) }) }
+    pendingClear?.let { selected -> DeleteAllDownloadsDialog(selected.size, selected.any { !it.state.isFinished },
+        onDismiss = { pendingClear = null }, onDelete = { deleteFiles -> pendingClear = null; vm.removeAllDownloads(selected, deleteFiles) }) }
 }
