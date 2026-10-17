@@ -30,7 +30,10 @@ class AppFlowTest {
     private fun start(source: MediaSource? = null): AppViewModel {
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         runCatching { WorkManager.initialize(context, Configuration.Builder().build()) }
-        val vm = AppViewModel(context, source ?: FakeSource(Media("test", "", "Test")))
+        val vm = AppViewModel(context, source ?: FakeSource(Media("test", "", "Test")), object : AppUpdateSource {
+            override fun check(): AppRelease? = null
+            override fun download(release: AppRelease, progress: (Int) -> Unit): File = error("No app update expected")
+        })
         ui.setContent { StreamPocketTheme { StreamPocket(vm = vm) } }
         ui.waitForIdle()
         return vm
@@ -76,7 +79,7 @@ class AppFlowTest {
             override fun updateEngine(release: EngineRelease) { installs.incrementAndGet() }
         })
         checkEngineFromSettings(vm, EngineUpdateState.CURRENT)
-        ui.onNodeWithText("Up to date").assertIsDisplayed()
+        ui.onNode(hasText("Up to date") and hasAnyAncestor(hasTestTag("engine-update-setting"))).assertIsDisplayed()
         ui.onNodeWithText("Update", substring = false).assertDoesNotExist()
         ui.onNode(isDialog()).assertDoesNotExist()
         ui.onNodeWithContentDescription("Check for updates").performClick()
@@ -138,7 +141,7 @@ class AppFlowTest {
         checkEngineFromSettings(vm, EngineUpdateState.CHECK_FAILED)
         ui.onNodeWithText("Couldn't check for updates").assertIsDisplayed()
         ui.onNodeWithText("Update", substring = false).assertDoesNotExist()
-        ui.onNodeWithText("Up to date").assertDoesNotExist()
+        ui.onNode(hasText("Up to date") and hasAnyAncestor(hasTestTag("engine-update-setting"))).assertDoesNotExist()
         ui.onNodeWithText("The download engine is up to date.").assertDoesNotExist()
         ui.onNodeWithText("HTTP 503", substring = true).assertDoesNotExist()
         ui.onNodeWithContentDescription("Check for updates").performClick()
@@ -178,7 +181,7 @@ class AppFlowTest {
             ui.onNode(isDialog()).assertDoesNotExist()
             gate.countDown()
             awaitEngineState(vm, EngineUpdateState.CURRENT)
-            ui.onNodeWithText("Up to date").assertIsDisplayed()
+            ui.onNode(hasText("Up to date") and hasAnyAncestor(hasTestTag("engine-update-setting"))).assertIsDisplayed()
             ui.onNodeWithText("Update", substring = false).assertDoesNotExist()
         } finally { gate.countDown() }
     }
